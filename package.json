@@ -1,0 +1,21 @@
+{
+  "name": "alive",
+  "version": "0.1.0",
+  "description": "An ultra-lightweight, React-inspired library for reactive UI and data management, bridging the gap between React's declarative power and VanillaJS flexibility.",
+  "type": "module",
+  "main": "./alive.js",
+  "browser": "./alive.browser.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KingAlaluna/alive.git"
+  },
+  "keywords": [
+    "reactive",
+    "signals",
+    "effects",
+    "vanilla-js",
+    "library"
+  ],
+  "author": "KingAlaluna",
+  "license": "MIT"
+}
