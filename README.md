@@ -24,7 +24,7 @@ An ultra-lightweight, React-inspired library for reactive UI and data management
  * **setStyle()** — Targeted reactive inline style mutations.
  * **setClassName()** — Targeted reactive string className replacement.
  * **setClassList()** — Targeted reactive classList array manipulations (add, remove, toggle, etc.).
- * **setDataset()** — Targeted reactive data-* attribute injection.
+ * **setDataset()** — Targeted reactive data-attribute injection.
  * **setOtherParam()** — Universal tool to reactively control any other DOM element property (including styles, datasets, custom properties, etc.). While highly versatile, it is less compact than specialized tools.
 ## Tutorial & API Documentation
 ### 1. createSignal()
