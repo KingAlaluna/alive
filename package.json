@@ -1,6 +1,6 @@
 {
   "name": "alive",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An ultra-lightweight, React-inspired library for reactive UI and data management, bridging the gap between React's declarative power and VanillaJS flexibility.",
   "type": "module",
   "main": "./alive.js",

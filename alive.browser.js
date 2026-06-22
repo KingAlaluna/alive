@@ -3,13 +3,14 @@ const data = {
   signalsQuantity: 0,
   effectsQuantity: 0,
   
-  allKeyText: {},
-  allKeyOtherParam: {},
+  allSubscribers: {},
   
   allKeyEffect: {},
   allDataEffect: {},
   
   allKeyClearEffect: {},
+  
+  currentListener: null,
 };
 
 
@@ -24,12 +25,10 @@ let isBatchingScheduled = false;
 
 
 function batchUpdate() {
-  keysToUpdate.forEach(key => {
-    updateText(key);
-    updateOtherParam(key);
-    
+  for (const key of keysToUpdate) {
+    updateSubscriptions(key);
     addIdsEffects(key);
-  });
+  }
   
   keysToUpdate.clear();
   isBatchingScheduled = false;
@@ -39,7 +38,8 @@ function batchUpdate() {
 //створення синхронізованих змінних (аналог useState та useReducer)
 function createSignal(reducer, param) {
   data.signalsQuantity ++;
-  const value = reducer && param || reducer && param === null || reducer === null && param || reducer === null && param === null ? param : reducer;
+  const signalArguments = arguments.length;
+  const value = signalArguments == 2 ? param : reducer;
   const keySignal = data.signalsQuantity;
   let myValue = value;
   
@@ -47,11 +47,21 @@ function createSignal(reducer, param) {
     if (type == 'key') {
       return keySignal;
     }
-    else if (type) {
+    
+    if (data.currentListener) {
+      trackSubscriptions(keySignal, data.currentListener);
+    }
+    
+    if (type) {
       return (subType) => {
         if (subType == 'key') {
           return keySignal;
         }
+        
+        if (data.currentListener) {
+          trackSubscriptions(keySignal, data.currentListener);
+        }
+        
         const [path, dataPath] = getPathValue(type);
         const {keyType, lastKeyPath, value} = dataPath;
         
@@ -75,9 +85,9 @@ function createSignal(reducer, param) {
       newValue = nestedDataNewValue({path, team, key, newValue});
     }
     
-    const val = reducer && param || reducer && param === null ? reducer(newValue) : newValue;
+    const val = signalArguments == 2 ? reducer(newValue) : newValue;
     
-    if (getType(value) != 'object' && getType(value) != 'array' && getType(value) != 'map' && getType(value) != 'set') {
+    if (getType(myValue) != 'object' && getType(myValue) != 'array' && getType(myValue) != 'map' && getType(myValue) != 'set') {
       if (myValue === val) return;
     }
     
@@ -118,21 +128,24 @@ function createSignal(reducer, param) {
       }
     }
     
-    keysPath.forEach((e, i) => {
+    for (let i = 0; i < keysPath.length; i++) {
+      const e = keysPath[i];
+      
       if (i == keysPath.length - 1) {
         lastKeyPath = e;
         if (functionPath[i] !== undefined) {
           keyType = 'function';
           value = functionPath[i];
         }
-        return;
+        continue;
       }
       if (functionPath[i] !== undefined) {
         finalPath = finalPath[e](functionPath[i]);
-      } else {
+      } 
+      else {
         finalPath = finalPath[e];
       }
-    });
+    }
     
     return [finalPath, {
       keyType,
@@ -167,120 +180,63 @@ function createSignal(reducer, param) {
 
 
 //оновлення тексту для конкретного елемента (через textContent)
-function updateText(key) {
-  if (!data.allKeyText[key]) return;
-  
-  for (let i = data.allKeyText[key].length - 1; i >= 0; i--) {
-    const {
-      el,
-      text,
-      nodeText,
-    } = data.allKeyText[key][i];
-    
-    if (!el.isConnected || !nodeText.text.isConnected) {
-      data.allKeyText[key].splice(i, 1);
-    } else {
-      newText(el, text, nodeText);
-    }
-  }
-}
-
-
 function setText(el, text) {
-  const nodeText = {text: document.createTextNode('')};
-  el.append(nodeText.text);
+  const nodeText = document.createTextNode('');
   
-  if (Array.isArray(text)) {
-    text.forEach(e => {
-      getType(e) == 'function' && e('key') ? addDataText(el, text, nodeText, e('key')) : null;
-    });
-  } 
-  else if (getType(text) == 'function' && text('key')) {
-    addDataText(el, text, nodeText, text('key'));
-  }
-  else {
-    newText(el, text, nodeText);
-  }
-}
-
-function addDataText(el, text, nodeText, key) {
-  if (!Array.isArray(data.allKeyText[key])) {
-    data.allKeyText[key] = [];
-  }
-  data.allKeyText[key].push({
-    el,
-    text,
-    nodeText,
-  });
-  
-  newText(el, text, nodeText);
-}
-
-
-function newText(el, text, nodeText) {
-  if (Array.isArray(text)) {
-    let finalText = '';
-    
-    text.forEach(e => {
-      finalText += getType(e) == 'function' ? e() : e;
-    });
-    nodeText.text.data = finalText;
-  } 
-  else if (getType(text) == 'function' && text && text('key')) {
-    nodeText.text.data = text();
-  }
-  else {
-    nodeText.text.data = text;
-  }
+  bindReactive(nodeText, text, (value) => nodeText.data = value);
+  el.append(nodeText);
 }
 
 
 
 //оновлення html елементів, та іх створення через append
-function setAppend(el, code) {
+function setAppend(el, code, elNewTypeNS = 'xhtml') {
   const elements = getType(code) == 'function' ? code(newElement) : code;
   
-  elements.forEach(e => {
+  for (const e of elements) {
     if (getType(e) == 'object') {
-      const {elType, elParam, elContent} = e;
-      if (!elType) return;
-      createEl(el, elType, elParam, elContent);
-    } else {
+      const {elType, elTypeNS, elParams, elContent} = e;
+      
+      if (!elType) continue;
+      if (elTypeNS) {
+        elNewTypeNS = elTypeNS;
+      }
+      
+      createEl(el, elType, elNewTypeNS, elParams, elContent);
+    } 
+    else {
       setText(el, e);
     }
-  });
+  }
 }
 
-function newElement(elType, elParam, ...elContent) {
+function newElement(elType, elParams, ...elContent) {
   if (!elType) return;
-  return {elType, elParam, elContent};
-}
-
-function createEl(el, elType, elParam, elContent) {
-  const newEl = document.createElement(elType);
   
-  if (elParam && getType(elParam) == 'object') {
-    for (const key in elParam) {
-      if (key == 'style' || key == 'dataset' || key == 'classList') {
-        for (const key2 in elParam[key]) {
-          if (key == 'classList') {
-            newEl[key][key2](elParam[key][key2]);
-          } else {
-            newEl[key][key2] = elParam[key][key2];
-          }
-        }
-      } 
-      else if (key == 'setParams') {
-        setParams(newEl, elParam[key]);
-      }
-      else {
-        newEl[key] = elParam[key];
-      }
-    }
+  let elTypeNS;
+  
+  if (['svg', 'math'].includes(elType)) {
+    elTypeNS = elType;
+  }
+  else if (['foreignObject', 'annotation-xml', 'mtext'].includes(elType)) {
+    elTypeNS = 'xhtml';
   }
   
+  return {elType, elTypeNS, elParams, elContent};
+}
+
+function createEl(el, elType, elTypeNS, elParams, elContent) {
+  const elementNS = {
+    xhtml: 'http://www.w3.org/1999/xhtml',
+    svg: 'http://www.w3.org/2000/svg',
+    math: 'http://www.w3.org/1998/Math/MathML',
+  };
+  
+  const newEl = document.createElementNS(elementNS[elTypeNS], elType);
+  
+  setParams(newEl, elTypeNS, elParams);
   el.append(newEl);
-  setAppend(newEl, elContent);
+  setAppend(newEl, elContent, elTypeNS);
 }
 
 
@@ -288,17 +244,17 @@ function createEl(el, elType, elParam, elContent) {
 
 
 //реактивні параметри!
-function setParams(el, params) {
-  params.forEach(param => {
-    if (typeof param[0] == 'string' && getType(param[1]) == 'function' && param[1]('key')) {
-      addDataOtherParam(el, {type: param[0], key: param[1]('key'), param: param[1]});
+function setParams(newEl, elTypeNS, elParams) {
+  if (!elParams || getType(elParams) != 'object') return;
+  
+  for (const key in elParams) {
+    if (key == 'onclick') {
+      newEl[key] = elParams[key];
+    } 
+    else {
+      setOtherParam(newEl, key, elParams[key], elTypeNS);
     }
-    else if (typeof param[0] == 'string' && getType(param[1]) == 'object') {
-      for (const key in param[1]) {
-        addDataOtherParam(el, {type: param[0], type2: key, key : param[1][key]('key'), param: param[1][key]});
-      }
-    }
-  });
+  }
 }
 
 
@@ -325,64 +281,154 @@ function setDataset(el, param) {
 
 
 //інші реактивні параметри!
-function setOtherParam(el, type, param) {
-  if (param && getType(param) == 'object') {
+function setOtherParam(el, type, param, elTypeNS) {
+  if (!param) return;
+  
+  if (!elTypeNS) {
+    const xhtml = el.closest('foreignObject, annotation-xml, mtext');
+    const svg = el.closest('svg');
+    const math = el.closest('math');
+    
+    if (svg) {
+      elTypeNS = 'svg';
+    }
+    else if (math) {
+      elTypeNS = 'math';
+    }
+    else if (xhtml) {
+      elTypeNS = 'xhtml';
+    }
+    else {
+      elTypeNS = 'xhtml';
+    }
+  }
+  
+  
+  if (getType(param) == 'object') {
     for (const key in param) {
-      if (param[key]('key')) {
-        addDataOtherParam(el, {key: param[key]('key'), type, type2: key, param: param[key]});
-      } else {
-        newOtherParam(el, {type, type2: key, param: param[key]});
+      bindReactive(el, param[key], (value) => domWriter(el, {type, type2: key, elTypeNS, value}));
+    }
+  }
+  else {
+    bindReactive(el, param, (value) => domWriter(el, {type, type2: null, elTypeNS, value}));
+  }
+}
+
+
+function valueResolver(param) {
+  if (getType(param) == 'function' && param('key')) {
+    return valueResolver(param());
+  }
+  else if (getType(param) == 'array') {
+    let paramContent = '';
+    
+    for (const e of param) {
+      paramContent += valueResolver(e);
+    }
+    return paramContent;
+  } 
+  else if (getType(param) == 'object') {
+    const resolvedObj = {};
+    
+    for (const key in param) {
+      resolvedObj[key] = valueResolver(param[key]);
+    }
+    return resolvedObj;
+  }
+  else {
+    return param;
+  }
+}
+
+
+
+function domWriter(el, {type, type2, elTypeNS, value}) {
+  const attributeNS = {
+    xml: 'http://www.w3.org/XML/1998/namespace',
+    xmlns: 'http://www.w3.org/2000/xmlns/',
+    xlink: 'http://www.w3.org/1999/xlink',
+  };
+  
+  
+  if (['style', 'dataset', 'classList'].includes(type)) {
+    if (type == 'classList') {
+      el[type][type2](value);
+    } 
+    else {
+      if (type2) {
+        el[type][type2] = value;
+      }
+      else if (getType(value) == 'object') {
+        for (let key in value) {
+          el[type][key] = value[key];
+        }
+      }
+    }
+  } 
+  else {
+    if (elTypeNS == 'xhtml') {
+      el[type] = value;
+    } 
+    else {
+      if (type == 'xmlns' || type.includes('xmlns:')) {
+        el.setAttributeNS(attributeNS['xmlns'], type, value);
+      }
+      else if (type.includes('xml:')) {
+        el.setAttributeNS(attributeNS['xml'], type, value);
+      }
+      else if (type.includes('xlink:')) {
+        el.setAttributeNS(attributeNS['xlink'], type, value);
+      } 
+      else {
+        el.setAttribute(type, value);
       }
     }
   }
-  else if (param && typeof param != 'object') {
-    if (param('key')) {
-      addDataOtherParam(el, {key: param('key'), type, type2: null, param});
-    } else {
-      newOtherParam(el, {type, type2: null, param})
-    }
-  }
 }
 
-function addDataOtherParam(el, {key, type, type2, param}) {
-  if (!Array.isArray(data.allKeyOtherParam[key])) {
-    data.allKeyOtherParam[key] = [];
+
+function trackSubscriptions(key, updateFunction) {
+  if (!data.allSubscribers[key]) {
+    data.allSubscribers[key] = [];
   }
-  data.allKeyOtherParam[key].push({
-    el,
-    type,
-    type2,
-    param,
-  });
   
-  newOtherParam(el, {type, type2, param: param()});
-}
-
-function newOtherParam(el, {type, type2, param}) {
-  if (type == 'classList') {
-    type2 ? el[type][type2](param) : el[type](param);
-  } else {
-    type2 ? el[type][type2] = param : el[type] = param;
+  if (!data.allSubscribers[key].includes(updateFunction)) {
+    data.allSubscribers[key].push(updateFunction);
   }
 }
 
-function updateOtherParam(key) {
-  if (!data.allKeyOtherParam[key]) return;
+
+function updateSubscriptions(key) {
+  if (!data.allSubscribers[key]) return;
   
-  for (let i = data.allKeyOtherParam[key].length - 1; i >= 0; i--) {
-    const {
-      el,
-      type,
-      type2,
-      param,
-    } = data.allKeyOtherParam[key][i];
+  for (let i = data.allSubscribers[key].length - 1; i >= 0; i--) {
+    const e = data.allSubscribers[key][i];
     
-    if (!el.isConnected) {
-      data.allKeyOtherParam[key].splice(i, 1);
-    } else {
-      newOtherParam(el, {type, type2, param: param()});
+    const result = e();
+    if (!result) {
+      data.allSubscribers[key].splice(i, 1);
     }
   }
+}
+
+
+function bindReactive(el, param, callback) {
+  let isFirstCall = true;
+
+  const updateFunction = () => {
+    if (!isFirstCall && !el.isConnected) return false;
+    isFirstCall = false;
+    data.currentListener = updateFunction;
+    
+    const resolvedValue = valueResolver(param);
+    
+    data.currentListener = null;
+    
+    callback(resolvedValue);
+    return true;
+  };
+  
+  updateFunction();
 }
 
 
@@ -398,12 +444,12 @@ function createEffect(code, signals, clearCheck) {
   const clearFunction = code(removeEffect);
   if (!signals) return;
   
-  signals.forEach(e => {
-    if (getType(e) == 'function' && e('key')) {
-      !data.allKeyEffect[e('key')] ? data.allKeyEffect[e('key')] = [] : null;
-      data.allKeyEffect[e('key')].push(id);
-    }
-  });
+  for (const e of signals) {
+    if (getType(e) != 'function' || !e('key')) continue;
+    
+    !data.allKeyEffect[e('key')] ? data.allKeyEffect[e('key')] = [] : null;
+    data.allKeyEffect[e('key')].push(id);
+  }
   
   data.allDataEffect[id] = {
     clearCheck,
@@ -418,19 +464,19 @@ function createEffect(code, signals, clearCheck) {
     delete data.allKeyClearEffect[id];
     delete data.allDataEffect[id];
     
-    signals.forEach(e => {
+    for (const e of signals) {
       if (getType(e) == 'function' && e('key')) {
         data.allKeyEffect[e('key')] = data.allKeyEffect[e('key')].filter(effectId => effectId != id);
         if (data.allKeyEffect[e('key')].length == 0) {
           delete data.allKeyEffect[e('key')];
         }
       }
-    });
+    }
   }
 }
 
 function updateEffect() {
-  idsEffects.forEach(e => {
+  for (const e of idsEffects) {
     if (!data.allDataEffect[e]) return;
     
     const {
@@ -443,7 +489,8 @@ function updateEffect() {
     
     if (!clearCheck) {
       data.allDataEffect[e].clearFunction = code(removeEffect);
-    } else {
+    } 
+    else {
       const check = clearCheck();
       
       if (!check) data.allKeyClearEffect[keyClear] = false;
@@ -452,17 +499,21 @@ function updateEffect() {
       if (check) {
         data.allKeyClearEffect[keyClear] = true;
         clearFunction();
-      } else {
+      } 
+      else {
         data.allDataEffect[e].clearFunction = code(removeEffect);
       }
     }
-  });
+  }
   idsEffects.clear();
 }
 
 function addIdsEffects(key) {
   if (!data.allKeyEffect[key]) return;
-  data.allKeyEffect[key].forEach(e => idsEffects.add(e));
+  
+  for (const e of data.allKeyEffect[key]) {
+    idsEffects.add(e);
+  }
 }
 
 

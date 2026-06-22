@@ -34,7 +34,7 @@ CRITICAL NOTES:
 
 - createSignal accepts up to 2 arguments: createSignal(reducer, value).
   1. If only 1 argument is passed, it defaults to the initial state value.
-  2. If you want to use a custom Reducer function, you MUST explicitly provide null as the second argument. Otherwise, createSignal will mistake your reducer function for an initial state value. Neither argument is strictly mandatory.
+  2. If you want to use the custom Reducer function, you must specify both arguments (even if it is null or undefined). Otherwise, createSignal will take your Reducer function as the initial state value. None of the arguments is strictly required.
 
 - The getter function (e.g., getName) accepts exactly 1 optional argument: a string path. This is used exclusively to deeply extract nested data structures.
 
@@ -254,40 +254,38 @@ e('p', {
   onclick: () => {
     console.log('hello');
   }
-  // Binds any standard global DOM event handlers or properties
+  // Binds any standard global DOM event handlers or properties. 
+  // CRITICAL: Always use lowercase naming conventions (onclick, oninput, onkeydown) 
+  // as the engine maps them directly to the native element properties.
 }, 'hello')
 
 ```
-#### Reactive Parameter Binding via setParams:
-To control attributes dynamically inside setAppend, use the specialized setParams array parameter, which is engineered exclusively for element builder contexts.
+#### Reactive property binding:
+The engine automatically scans and detects reactive signals nested deep within `style`, `dataset`, `classList`, or any other attributes. You can easily mix static values and reactive hooks.
+
 ```javascript
 const [getColor, setColor] = createSignal('#f00');
 const [getWidth, setWidth] = createSignal('4rem');
 const [getType, setType] = createSignal('main');
 
 e('h1', {
-  // setParams maps properties dynamically to tracking hooks
-  setParams: [
-    'style', {
-      color: getColor,
-      width: getWidth,
-      background: '#0f0' // Static assignments can be interlinked here smoothly
-    },
-    'dataset', {
-      type: getType
-    }
-  ],
-  
-  // Can be seamlessly combined with standard static attributes
+  // The engine automatically detects functions/signals and subscribes to them
   style: {
-    border: '1px solid #f00',
-    padding: '0.5rem 1rem'
+    color: getColor,       // Reactive hook
+    width: getWidth,       // Reactive hook
+    background: '#0f0',    // Static
+    border: ['1px solid', getColor], // Reactive hook
+    borderRadius: '0.5rem' // Static
   },
+  
+  dataset: {
+    type: getType          // Reactive hook
+  },
+  
   onclick: () => {
-    setWidth('8rem');
+    setWidth('8rem');      // Modifies the signal, instantly updating the element width
   }
 }, 'hello')
-
 ```
 #### Inline Text Nodes Processing (Static vs. Reactive):
 ```javascript
