@@ -1,10 +1,10 @@
 # Alive
 An ultra-lightweight, React-inspired library for reactive UI and data management, bridging the gap between React's declarative power and VanillaJS flexibility.
 ## Links
-1. [alive](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@main/alive.js)
-2. [alive.min](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@main/alive.min.js)
-3. [alive.browser](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@main/alive.browser.js)
-4. [alive.browser.min](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@main/alive.browser.min.js)
+1. [alive](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@v0.2.0/alive.js)
+2. [alive.min](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@v0.2.0/alive.min.js)
+3. [alive.browser](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@v0.2.0/alive.browser.js)
+4. [alive.browser.min](https://cdn.jsdelivr.net/gh/KingAlaluna/alive@v0.2.0/alive.browser.min.js)
 ## Notes
  1. **Alive** will be much easier to understand for users who already know the true meaning of "reactivity", are familiar with frameworks/libraries like React, Preact, or SolidJS, and know how to build React applications in pure JavaScript **WITHOUT JSX**.
  2. **Key Differences Between Alive and React:**
